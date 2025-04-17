@@ -11,6 +11,7 @@ import { DeliveryItem } from './delivery-item.entity';
 import { Checkpoint } from '../checkpoints/checkpoint.entity';
 import {User} from "../users/user.entity";
 import {DeliveryStatus} from "./shared/const/delivery-status.enum";
+import {Expose} from "class-transformer";
 
 @Entity()
 export class Delivery {
@@ -64,6 +65,12 @@ export class Delivery {
 
     @Column({ nullable: true })
     proof_image_url: string;
+
+    @Expose()
+    get full_image_url(): string {
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+        return this.proof_image_url ? `${baseUrl}${this.proof_image_url}` : null;
+    }
 
     @Column({ default: 'order_delivery' }) // or 'internal_transfer', etc.
     type: 'order_delivery' | 'internal_transfer';

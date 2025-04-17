@@ -211,9 +211,14 @@ export class DeliveriesService {
     }
 
     async uploadProofAndAdjustStock(deliveryId: number, filename: string) {
+        const findDelivery = await this.findOneById(deliveryId);
+        let relations = ['from', 'items']
+        if (findDelivery.type === 'internal_transfer') relations = [...relations, 'items.product']
+        else if (findDelivery.type === 'order_delivery') relations = [...relations, 'items.orderItem', 'items.orderItem.product', 'order']
+
         const delivery = await this.deliveriesRepo.findOne({
             where: { id: deliveryId },
-            relations: ['from', 'items', 'items.orderItem.product', 'order'],
+            relations, // 🚫 removed 'to'
         });
 
         if (!delivery) throw new NotFoundException('Delivery not found');
@@ -277,7 +282,7 @@ export class DeliveriesService {
 
                 if (allDelivered) {
                     await this.orderRepo.update(delivery.order.id, {
-                        status: OrderStatus.COMPLETED, // ganti sesuai OrderStatus enum kamu
+                        status: OrderStatus.COMPLETED,
                     });
                 }
             }

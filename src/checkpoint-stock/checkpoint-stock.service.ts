@@ -95,12 +95,12 @@ export class CheckpointStockService {
                 .createQueryBuilder('stock')
                 .setLock('pessimistic_write')
                 .useTransaction(true)
-                .where('stock.checkpoint_id = :checkpointId AND stock.product_id = :productId', {
+                .where('stock.checkpoint.id = :checkpointId AND stock.product.id = :productId', {
                     checkpointId,
                     productId,
                 })
-                .leftJoinAndSelect('stock.checkpoint', 'checkpoint')
-                .leftJoinAndSelect('stock.product', 'product')
+                .innerJoinAndSelect('stock.checkpoint', 'checkpoint')
+                .innerJoinAndSelect('stock.product', 'product')
                 .getOne();
 
             if (!stock) {
