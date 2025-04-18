@@ -5,11 +5,15 @@ import {
     Param,
     Post,
     Delete,
-    NotFoundException, Patch, Query,
+    NotFoundException, Patch, Query, UseInterceptors, UploadedFile,
 } from '@nestjs/common';
 import { InvoiceService } from './invoice.service';
 import { CreateInvoiceDto } from './shared/dto/create-invoice.dto';
 import {QueryProductDto} from "../products/shared/dto/query-product.dto";
+import {FileInterceptor} from "@nestjs/platform-express";
+import {diskStorage} from "multer";
+import {extname} from "path";
+import {CreatePaymentDto} from "./shared/dto/create-payment.dto";
 
 @Controller('invoices')
 export class InvoiceController {
@@ -23,8 +27,28 @@ export class InvoiceController {
     }
 
     @Get('available')
-    async getAvailableInvoices(@Query() query: {productId: number, customerId: number}) {
-        return this.invoiceService.getAvailableInvoices(query.productId, query.customerId);
+    async getAvailableInvoices(@Query() query: {productId: string, customerId: string}) {
+        return this.invoiceService.getAvailableInvoices(Number(query.productId), Number(query.customerId));
+    }
+
+    @Post('payment')
+    @UseInterceptors(
+        FileInterceptor('file', {
+            storage: diskStorage({
+                destination: './uploads/payments',
+                filename: (req, file, cb) => {
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                    const ext = extname(file.originalname);
+                    cb(null, `payment-${uniqueSuffix}${ext}`);
+                },
+            }),
+        }),
+    )
+    async createPayment(
+        @Body() dto: CreatePaymentDto,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        return this.invoiceService.createPayment(dto, file);
     }
 
     @Get(':id')

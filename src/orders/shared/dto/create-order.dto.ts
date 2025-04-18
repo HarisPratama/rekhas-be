@@ -36,4 +36,8 @@ export class CreateOrderDto {
     @IsOptional()
     @IsNumber()
     sales_id: number;
+
+    @IsOptional()
+    @IsNumber()
+    invoice_id: number;
 }

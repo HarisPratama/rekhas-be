@@ -5,11 +5,13 @@ import {
     ManyToOne,
     OneToOne,
     JoinColumn,
-    CreateDateColumn, ManyToMany, JoinTable,
+    CreateDateColumn, ManyToMany, JoinTable, OneToMany,
 } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
 import { Customer } from '../../customers/entities/customer.entity';
 import {Product} from "../../products/entities/product.entity";
+import {Payment} from "./payment.entity";
+import {InvoiceStatusEnum} from "../shared/const/invoice-status.enum";
 
 @Entity()
 export class Invoice {
@@ -28,7 +30,11 @@ export class Invoice {
     @Column({nullable: true})
     due_date: Date;
 
-    @Column()
+    @Column({
+        type: 'enum',
+        enum: InvoiceStatusEnum,
+        default: InvoiceStatusEnum.UNPAID,
+    })
     status: string; // e.g. "PAID", "UNPAID", "CANCELLED"
 
     @CreateDateColumn()
@@ -61,4 +67,7 @@ export class Invoice {
         },
     })
     products: Product[];
+
+    @OneToMany(() => Payment, payment => payment.invoice)
+    payments: Payment[];
 }

@@ -7,10 +7,11 @@ import {OrdersModule} from "../orders/order.module";
 import {CustomerModule} from "../customers/customer.module";
 import {ProductsModule} from "../products/product.module";
 import {WorkShopModule} from "../workshops/workshop.module";
+import {Payment} from "./entities/payment.entity";
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Invoice]),
+        TypeOrmModule.forFeature([Invoice, Payment]),
         CustomerModule,
         ProductsModule,
         forwardRef(() => OrdersModule),

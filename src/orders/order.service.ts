@@ -9,6 +9,8 @@ import {Cart} from "../cart/entities/cart.entity";
 import {OrderItemImage} from "./entities/order-item-image.entity";
 import {CreateOrderDto} from "./shared/dto/create-order.dto";
 import {Workshop} from "../workshops/workshop.entity";
+import {Invoice} from "../invoices/entities/invoice.entity";
+import {InvoiceService} from "../invoices/invoice.service";
 
 @Injectable()
 export class OrdersService {
@@ -75,6 +77,22 @@ export class OrdersService {
                 throw new NotFoundException('Cart is empty');
             }
 
+            let invoice: Invoice;
+            if (dto.invoice_id) {
+                invoice = await queryRunner.manager.findOne(Invoice, {
+                    where: {
+                        id: dto.invoice_id,
+                        customer_id: dto.customerId,
+                        order_id: null
+                    }
+                })
+
+                if (!invoice) {
+                    throw new NotFoundException('Invoice does not exist');
+                }
+            }
+
+
             const orderCode = await this.generateOrderCode();
 
             // Generate order items and calculate total amount
@@ -129,9 +147,17 @@ export class OrdersService {
 
             await queryRunner.manager.save(workshops);
 
+            // update invoice jika ada
+            if (invoice) {
+                invoice.total_amount = totalAmount;
+                invoice.order_id = savedOrder.id;
+
+                await queryRunner.manager.save(invoice);
+            }
+
             // Clear cart
-            await this.cartItemRepo.remove(cart.items);
-            await this.cartRepo.remove(cart);
+            await queryRunner.manager.remove(cart.items);
+            await queryRunner.manager.remove(cart);
 
             await queryRunner.commitTransaction();
             return savedOrder;

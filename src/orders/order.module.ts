@@ -14,6 +14,7 @@ import {InvoiceModule} from "../invoices/invoice.module";
     imports: [
         TypeOrmModule.forFeature([Order, OrderItem, OrderItemImage]),
         CartModule,
+        InvoiceModule,
         forwardRef(() => WorkShopModule),
         forwardRef(() => DeliveriesModule),
     ],

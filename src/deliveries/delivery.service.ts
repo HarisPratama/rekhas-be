@@ -304,6 +304,7 @@ export class DeliveriesService {
                 }
 
                 delivery.status = DeliveryStatus.DELIVERED;
+                delivery.delivered_at = new Date();
                 await queryRunner.manager.save(delivery);
 
                 // ✅ Cek apakah semua delivery & workshop order sudah selesai
