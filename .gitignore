@@ -2,9 +2,7 @@
 /dist
 /node_modules
 /build
-uploads/customer/
-uploads/products/
-uploads/proofs/
+uploads/
 # Logs
 logs
 *.log
