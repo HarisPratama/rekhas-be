@@ -12,6 +12,7 @@ import {User} from "../users/user.entity";
 import {WorkshopStatus} from "./shared/const/workshop-status.enum";
 import {Product} from "../products/entities/product.entity";
 import {CustomerMeasurement} from "../customers/entities/customer-measurement.entity";
+import {OrderItem} from "../orders/entities/order-item.entity";
 
 @Entity()
 export class Workshop {
@@ -37,14 +38,14 @@ export class Workshop {
     tailor: User;
 
     @Column({ nullable: true })
-    product_id: number;
-
-    @ManyToOne(() => Product)
-    @JoinColumn({ name: 'product_id' })
-    product: Product;
-
-    @Column({ nullable: true })
     cutter_id: number;
+
+    @Column()
+    order_item_id: number;
+
+    @ManyToOne(() => OrderItem, orderItem => orderItem.workshops, { eager: true })
+    @JoinColumn({ name: 'order_item_id' })
+    orderItem: OrderItem;
 
     @ManyToOne(() => User)
     @JoinColumn({ name: 'cutter_id' })

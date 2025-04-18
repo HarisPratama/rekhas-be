@@ -3,6 +3,7 @@ import {Order} from "./order.entity";
 import {Product} from "../../products/entities/product.entity";
 import {CustomerMeasurement} from "../../customers/entities/customer-measurement.entity";
 import {OrderItemImage} from "./order-item-image.entity";
+import {Workshop} from "../../workshops/workshop.entity";
 
 @Entity()
 export class OrderItem {
@@ -26,4 +27,8 @@ export class OrderItem {
 
     @OneToMany(() => OrderItemImage, (img) => img.orderItem, { cascade: true })
     images: OrderItemImage[];
+
+    // order-item.entity.ts
+    @OneToMany(() => Workshop, workshop => workshop.orderItem)
+    workshops: Workshop[];
 }

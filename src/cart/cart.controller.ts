@@ -1,4 +1,4 @@
-import {Body, Controller, Get, Param, ParseIntPipe, Post, UploadedFiles, UseInterceptors} from "@nestjs/common";
+import {Body, Controller, Delete, Get, Param, ParseIntPipe, Post, UploadedFiles, UseInterceptors} from "@nestjs/common";
 import {CartService} from "./cart.service";
 import {FilesInterceptor} from "@nestjs/platform-express";
 import {diskStorage} from "multer";
@@ -51,6 +51,12 @@ export class CartController {
     @Get(':customerId/cart')
     getCart(@Param('customerId') customerId: number) {
         return this.cartService.getCart(customerId);
+    }
+
+    @Delete('items/:id')
+    async deleteCartItem(@Param('id', ParseIntPipe) id: number) {
+        await this.cartService.deleteCartItem(id);
+        return { message: 'Cart item deleted successfully' };
     }
 
 }

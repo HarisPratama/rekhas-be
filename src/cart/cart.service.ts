@@ -34,7 +34,11 @@ export class CartService {
             cart = this.cartRepo.create({ customer, items: [] });
         }
 
-        const existingItem = cart.items.find((item) => item.product.id === productId);
+        const existingItem = cart.items.find(
+            (item) =>
+                item.product.id === productId &&
+                item.customerMeasurement.id === customerMeasurementId,
+        );
         if (existingItem) {
             existingItem.quantity += quantity;
         } else {
@@ -116,5 +120,19 @@ export class CartService {
             relations: ['items', 'items.product'],
         });
     }
+
+    async deleteCartItem(cartItemId: number): Promise<void> {
+        const cartItem = await this.cartItemRepo.findOne({
+            where: { id: cartItemId },
+            relations: ['cart'],
+        });
+
+        if (!cartItem) {
+            throw new NotFoundException('Cart item not found');
+        }
+
+        await this.cartItemRepo.remove(cartItem);
+    }
+
 
 }

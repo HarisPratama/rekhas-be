@@ -1,6 +1,6 @@
 import {BadRequestException, Injectable, NotFoundException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
-import {Repository} from 'typeorm';
+import {DataSource, Repository} from 'typeorm';
 import {Delivery} from './delivery.entity';
 import {DeliveryItem} from './delivery-item.entity';
 import {DeliveryStatus} from "./shared/const/delivery-status.enum";
@@ -10,15 +10,20 @@ import {CreateInternalTransferDto} from "./shared/dto/create-internal-transfer.d
 import {Checkpoint} from "../checkpoints/checkpoint.entity";
 import {Order} from "../orders/entities/order.entity";
 import {OrderStatus} from "../orders/shared/const/order-status.enum";
+import {Product} from "../products/entities/product.entity";
+import {Workshop} from "../workshops/workshop.entity";
+import {WorkshopStatus} from "../workshops/shared/const/workshop-status.enum";
 
 @Injectable()
 export class DeliveriesService {
     constructor(
         @InjectRepository(Order) private orderRepo: Repository<Order>,
+        @InjectRepository(Product) private productRepo: Repository<Product>,
         @InjectRepository(Delivery) private deliveriesRepo: Repository<Delivery>,
         @InjectRepository(DeliveryItem) private deliveryItemsRepo: Repository<DeliveryItem>,
         @InjectRepository(Customer) private customerRepo: Repository<Customer>,
-        private readonly stockService: CheckpointStockService
+        private stockService: CheckpointStockService,
+        private readonly dataSource: DataSource,
     ) {}
 
     async generateDeliveryCode() {
@@ -211,84 +216,129 @@ export class DeliveriesService {
     }
 
     async uploadProofAndAdjustStock(deliveryId: number, filename: string) {
-        const findDelivery = await this.findOneById(deliveryId);
-        let relations = ['from', 'items']
-        if (findDelivery.type === 'internal_transfer') relations = [...relations, 'items.product']
-        else if (findDelivery.type === 'order_delivery') relations = [...relations, 'items.orderItem', 'items.orderItem.product', 'order']
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
-        const delivery = await this.deliveriesRepo.findOne({
-            where: { id: deliveryId },
-            relations, // 🚫 removed 'to'
-        });
+        try {
+            const findDelivery = await this.findOneById(deliveryId);
 
-        if (!delivery) throw new NotFoundException('Delivery not found');
-
-        // Save proof image
-        delivery.proof_image_url = `/uploads/proofs/${filename}`;
-
-        // If not delivered yet, adjust stock
-        if (delivery.status !== DeliveryStatus.DELIVERED) {
-            for (const item of delivery.items) {
-                const product = delivery.type === 'internal_transfer'
-                    ? item.product
-                    : item.orderItem?.product;
-
-                if (!product) continue;
-
-                // Deduct from source
-                await this.stockService.adjustStock(delivery.from.id, product.id, -item.quantity_delivered);
-
-                // If internal transfer, add to destination
-                if (delivery.type === 'internal_transfer') {
-                    await this.stockService.adjustStock(delivery.to_id, product.id, item.quantity_delivered);
-                }
+            let relations = ['from', 'items'];
+            if (findDelivery.type === 'internal_transfer') {
+                relations = [...relations, 'items.product'];
+            } else if (findDelivery.type === 'order_delivery') {
+                relations = [...relations, 'items.orderItem', 'items.orderItem.product', 'order'];
             }
 
-            // ✅ Update customer data if to_type is customer
-            if (delivery.to_type === 'customer') {
-                const customer = await this.customerRepo.findOne({
-                    where: { id: delivery.to_id },
-                });
+            const delivery = await queryRunner.manager.findOne(Delivery, {
+                where: { id: deliveryId },
+                relations,
+            });
 
-                if (customer) {
-                    let deliveryRevenue = 0;
-                    let totalItems = 0;
+            if (!delivery) throw new NotFoundException('Delivery not found');
 
-                    for (const item of delivery.items) {
-                        const product = item.orderItem.product;
-                        deliveryRevenue += Number(product.price) * item.quantity_delivered;
-                        totalItems += item.quantity_delivered;
+            // Save proof image
+            delivery.proof_image_url = `/uploads/proofs/${filename}`;
+
+            if (delivery.status !== DeliveryStatus.DELIVERED) {
+                for (const item of delivery.items) {
+                    const product = delivery.type === 'internal_transfer'
+                        ? item.product
+                        : item.orderItem?.product;
+
+                    if (!product) continue;
+
+                    // Deduct from source stock
+                    await this.stockService.adjustStockWithQueryRunner(
+                        queryRunner,
+                        delivery.from.id,
+                        product.id,
+                        -item.quantity_delivered,
+                    );
+
+                    // Deduct global product quantity
+                    if (delivery.to_type === 'customer') {
+                        const prod = await queryRunner.manager.findOne(Product, {
+                            where: { id: product.id },
+                        });
+                        if (prod) {
+                            prod.quantity -= item.quantity_delivered;
+                            if (prod.quantity < 0) throw new BadRequestException('Not enough global stock');
+                            await queryRunner.manager.save(prod);
+                        }
                     }
 
-                    customer.num_of_orders += 1;
-                    customer.num_of_items += totalItems;
-                    customer.revenue += deliveryRevenue;
-
-                    await this.customerRepo.save(customer);
+                    // Add to destination checkpoint if internal transfer
+                    if (delivery.type === 'internal_transfer') {
+                        await this.stockService.adjustStockWithQueryRunner(
+                            queryRunner,
+                            delivery.to_id,
+                            product.id,
+                            item.quantity_delivered,
+                        );
+                    }
                 }
-            }
 
-            // Update status delivery
-            delivery.status = DeliveryStatus.DELIVERED;
-            await this.deliveriesRepo.save(delivery);
-
-            // ✅ Cek apakah semua delivery dari order ini sudah selesai
-            if (delivery.order) {
-                const relatedDeliveries = await this.deliveriesRepo.find({
-                    where: { order: { id: delivery.order.id } },
-                });
-
-                const allDelivered = relatedDeliveries.every(d => d.status === DeliveryStatus.DELIVERED);
-
-                if (allDelivered) {
-                    await this.orderRepo.update(delivery.order.id, {
-                        status: OrderStatus.COMPLETED,
+                // Update customer data
+                if (delivery.to_type === 'customer') {
+                    const customer = await queryRunner.manager.findOne(Customer, {
+                        where: { id: delivery.to_id },
                     });
-                }
-            }
-        }
 
-        return delivery;
+                    if (customer) {
+                        let deliveryRevenue = 0;
+                        let totalItems = 0;
+
+                        for (const item of delivery.items) {
+                            const product = item.orderItem.product;
+                            deliveryRevenue += Number(product.price) * item.quantity_delivered;
+                            totalItems += item.quantity_delivered;
+                        }
+
+                        customer.num_of_orders += 1;
+                        customer.num_of_items += totalItems;
+                        customer.revenue += deliveryRevenue;
+
+                        await queryRunner.manager.save(customer);
+                    }
+                }
+
+                delivery.status = DeliveryStatus.DELIVERED;
+                await queryRunner.manager.save(delivery);
+
+                // ✅ Cek apakah semua delivery & workshop order sudah selesai
+                if (delivery.order) {
+                    const orderId = delivery.order.id;
+
+                    const relatedDeliveries = await queryRunner.manager.find(Delivery, {
+                        where: { order: { id: orderId } },
+                    });
+
+                    const allDelivered = relatedDeliveries.every(d => d.status === DeliveryStatus.DELIVERED);
+
+                    const relatedWorkshops = await queryRunner.manager.find(Workshop, {
+                        where: { order: { id: orderId } },
+                    });
+
+                    const allWorkshopsDone = relatedWorkshops.every(w => w.status === WorkshopStatus.COMPLETED);
+
+                    if (allDelivered && allWorkshopsDone) {
+                        await queryRunner.manager.update(Order, orderId, {
+                            status: OrderStatus.COMPLETED,
+                        });
+                    }
+                }
+
+            }
+
+            await queryRunner.commitTransaction();
+            return delivery;
+        } catch (err) {
+            await queryRunner.rollbackTransaction();
+            throw err;
+        } finally {
+            await queryRunner.release();
+        }
     }
 
 

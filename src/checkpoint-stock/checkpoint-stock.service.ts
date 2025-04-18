@@ -1,6 +1,6 @@
 import {BadRequestException, Injectable} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {DataSource, Repository} from 'typeorm';
+import {DataSource, QueryRunner, Repository} from 'typeorm';
 import { CheckpointStock } from './checkpoint-stock.entity';
 
 @Injectable()
@@ -84,46 +84,39 @@ export class CheckpointStockService {
         });
     }
 
-    async adjustStock(checkpointId: number, productId: number, quantity: number) {
-        const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
+    async adjustStockWithQueryRunner(
+        queryRunner: QueryRunner,
+        checkpointId: number,
+        productId: number,
+        quantity: number,
+    ) {
+        let stock = await queryRunner.manager
+            .getRepository(CheckpointStock)
+            .createQueryBuilder('stock')
+            .setLock('pessimistic_write')
+            .useTransaction(true)
+            .where('stock.checkpoint.id = :checkpointId AND stock.product.id = :productId', {
+                checkpointId,
+                productId,
+            })
+            .innerJoinAndSelect('stock.checkpoint', 'checkpoint')
+            .innerJoinAndSelect('stock.product', 'product')
+            .getOne();
 
-        try {
-            let stock = await queryRunner.manager
-                .getRepository(CheckpointStock)
-                .createQueryBuilder('stock')
-                .setLock('pessimistic_write')
-                .useTransaction(true)
-                .where('stock.checkpoint.id = :checkpointId AND stock.product.id = :productId', {
-                    checkpointId,
-                    productId,
-                })
-                .innerJoinAndSelect('stock.checkpoint', 'checkpoint')
-                .innerJoinAndSelect('stock.product', 'product')
-                .getOne();
-
-            if (!stock) {
-                stock = queryRunner.manager.create(CheckpointStock, {
-                    checkpoint: { id: checkpointId },
-                    product: { id: productId },
-                    quantity: 0,
-                });
-            }
-
-            const newQty = stock.quantity + quantity;
-            if (newQty < 0) throw new BadRequestException('Not enough stock');
-
-            stock.quantity = newQty;
-            await queryRunner.manager.save(stock);
-            await queryRunner.commitTransaction();
-            return stock;
-        } catch (err) {
-            await queryRunner.rollbackTransaction();
-            throw err;
-        } finally {
-            await queryRunner.release();
+        if (!stock) {
+            stock = queryRunner.manager.create(CheckpointStock, {
+                checkpoint: { id: checkpointId },
+                product: { id: productId },
+                quantity: 0,
+            });
         }
+
+        const newQty = stock.quantity + quantity;
+        if (newQty < 0) throw new BadRequestException('Not enough stock');
+
+        stock.quantity = newQty;
+        return queryRunner.manager.save(stock);
     }
+
 
 }

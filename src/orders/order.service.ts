@@ -112,25 +112,28 @@ export class OrdersService {
                 sales_id: dto.sales_id, // kalau pakai sales bisa tambahkan salesId
             });
 
-            const savedOrder = await this.ordersRepo.save(order);
-
+            const savedOrder = await queryRunner.manager.save(order);
             // ✅ Tambahkan Workshop
+            // 🔁 Buat workshop berdasarkan OrderItem yang sudah tersimpan
+            const savedOrderItems = savedOrder.items;
 
-            const workshops = order.items.map((item) =>
+            const workshops = savedOrderItems.map((item) =>
                 this.workshopRepo.create({
                     order: savedOrder,
+                    orderItem: item, // 💡 relasi ManyToOne langsung ke OrderItem
                     notes: item.product.type,
                     type: item.product.type,
-                    product_id: item.product.id,
-                    customerMeasurement: item.customerMeasurement
+                    customerMeasurement: item.customerMeasurement,
                 })
             );
-            await this.workshopRepo.save(workshops);
+
+            await queryRunner.manager.save(workshops);
 
             // Clear cart
             await this.cartItemRepo.remove(cart.items);
             await this.cartRepo.remove(cart);
 
+            await queryRunner.commitTransaction();
             return savedOrder;
         } catch (error) {
             await queryRunner.rollbackTransaction();

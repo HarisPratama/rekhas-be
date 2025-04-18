@@ -8,6 +8,7 @@ import {OrderItemImage} from "./entities/order-item-image.entity";
 import {CartModule} from "../cart/cart.module";
 import {WorkShopModule} from "../workshops/workshop.module";
 import {DeliveriesModule} from "../deliveries/delivery.module";
+import {InvoiceModule} from "../invoices/invoice.module";
 
 @Module({
     imports: [

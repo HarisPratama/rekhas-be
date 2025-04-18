@@ -11,6 +11,7 @@ import { DeliveryStatus } from '../deliveries/shared/const/delivery-status.enum'
 import {User} from "../users/user.entity";
 import {CheckpointStock} from "../checkpoint-stock/checkpoint-stock.entity";
 import {OrderStatus} from "../orders/shared/const/order-status.enum";
+import {Invoice} from "../invoices/entities/invoice.entity";
 
 @Injectable()
 export class WorkshopService {
@@ -22,6 +23,7 @@ export class WorkshopService {
         @InjectRepository(DeliveryItem) private readonly deliveryItemRepo: Repository<DeliveryItem>,
         @InjectRepository(OrderItem) private readonly orderItemRepo: Repository<OrderItem>,
         @InjectRepository(CheckpointStock) private readonly checkpointStockRepo: Repository<CheckpointStock>,
+        @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
         private readonly dataSource: DataSource,
     ) {}
 
@@ -40,7 +42,12 @@ export class WorkshopService {
             const courier = await this.getCourierOrThrow(courierId, queryRunner);
             const deliveryCode = await this.generateNextDeliveryCode(queryRunner);
 
-            const orderItem = this.getOrderItemForWorkshop(order, workshop.product_id);
+            const orderItem = workshop.orderItem;
+
+            if (!orderItem) {
+                throw new Error('Matching OrderItem not found for this workshop.');
+            }
+
             const fromCheckpointId = await this.findCheckpointWithStockOrThrow(orderItem, queryRunner);
 
             const delivery = queryRunner.manager.create(Delivery, {
@@ -65,7 +72,6 @@ export class WorkshopService {
 
             await queryRunner.commitTransaction();
             return savedDelivery;
-
         } catch (error) {
             console.error('Failed to schedule delivery:', error)
             await queryRunner.rollbackTransaction();
@@ -74,7 +80,6 @@ export class WorkshopService {
             await queryRunner.release();
         }
     }
-
 
     async getWorkshopProducts(workshopId: number) {
         const workshop = await this.workshopRepo.findOne({
@@ -101,7 +106,8 @@ export class WorkshopService {
             .createQueryBuilder('workshop')
             .leftJoinAndSelect('workshop.order', 'order')
             .leftJoinAndSelect('order.customer', 'customer')
-            .leftJoinAndSelect('workshop.product', 'product')
+            .leftJoinAndSelect('workshop.orderItem', 'orderItem')
+            .leftJoinAndSelect('orderItem.product', 'product')
             .skip(skip)
             .take(limit);
 
@@ -131,7 +137,7 @@ export class WorkshopService {
         return this.workshopRepo.findOne(
             {
                 where: { id },
-                relations: ['order', 'order.customer', 'product', 'tailor', 'cutter', 'customerMeasurement'],
+                relations: ['order', 'order.customer', 'orderItem', 'orderItem.product', 'tailor', 'cutter', 'customerMeasurement'],
             }
         );
     }
@@ -156,18 +162,48 @@ export class WorkshopService {
     }
 
     async updateStatus(id: number, status: WorkshopStatus) {
-        const order = await this.workshopRepo.findOneBy({ id });
-        if (!order) throw new NotFoundException('Workshop not found');
+        const workshop = await this.workshopRepo.findOne({
+            where: { id },
+            relations: ['order'],
+        });
 
-        order.status = status;
-        return this.workshopRepo.save(order);
+        if (!workshop) throw new NotFoundException('Workshop not found');
+
+        // ✅ Cek sebelum update ke ON_PROCESS
+        if (status === WorkshopStatus.ON_PROCESS) {
+            const order = workshop.order;
+
+            if (!order) {
+                throw new BadRequestException('Workshop is not linked to an order');
+            }
+
+            // Cari invoice terkait order ini
+            const invoice = await this.invoiceRepo.findOne({
+                where: { order_id: order.id },
+            });
+
+            if (!invoice) {
+                throw new BadRequestException('Invoice not found for this order, you need to generate invoice first');
+            }
+
+            // Misalnya payment_type disimpan sebagai string
+            if (order.payment_method !== 'cash') {
+                if (invoice.status !== 'PAID') {
+                    throw new BadRequestException('Invoice is not fully paid');
+                }
+            }
+        }
+
+        workshop.status = status;
+        return this.workshopRepo.save(workshop);
     }
+
 
 //     helper
     private async getWorkshopOrThrow(id: number, qr: QueryRunner) {
         const workshop = await qr.manager.findOne(Workshop, {
             where: { id },
-            relations: ['order', 'order.customer'],
+            relations: ['order', 'order.customer', 'orderItem', 'orderItem.product'],
         });
         if (!workshop) throw new NotFoundException('Workshop not found');
         return workshop;
