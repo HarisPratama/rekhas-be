@@ -1,9 +1,14 @@
 // src/users/user.controller.ts
-import {Controller, Get, Post, Body, Param, Delete, Put, Query} from '@nestjs/common';
+import {Controller, Get, Post, Body, Param, Delete, Put, Query, UseInterceptors, UploadedFile} from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './user.entity';
 import {CreateUserDto} from "./shared/dto/create-user.dto";
 import {QueryUserDto} from "./shared/dto/query-param-user.dto";
+import {FileInterceptor} from "@nestjs/platform-express";
+import {diskStorage} from "multer";
+import {extname} from "path";
+import {QueryParamsDto} from "../shared/dto/query-params.dto";
+import {instanceToPlain} from "class-transformer";
 
 @Controller('users')
 export class UserController {
@@ -14,9 +19,37 @@ export class UserController {
         return this.userService.create(data);
     }
 
+    @Post('profile')
+    @UseInterceptors(
+        FileInterceptor('profile', {
+            storage: diskStorage({
+                destination: './uploads/profiles',
+                filename: (req, file, cb) => {
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                    cb(null, `profile-${uniqueSuffix}${extname(file.originalname)}`);
+                },
+            }),
+        }),
+    )
+    async createUser(
+        @Body() body: CreateUserDto,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        return this.userService.create(body, file);
+    }
+
     @Get()
-    findAll() {
-        return this.userService.findAll();
+    async findAll(@Query() query: QueryParamsDto) {
+        const {
+            page = 1,
+            limit = 10,
+            order = 'DESC',
+            orderBy = 'user.created_at',
+            search = '',
+            role
+        } = query;
+        const users = await this.userService.findAll(role, page, limit, orderBy, order, search);
+        return instanceToPlain(users)
     }
 
     @Get('couriers')

@@ -39,7 +39,10 @@ export class ProductsService {
 
         // Optional search by product name
         if (search) {
-            queryBuilder.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+            queryBuilder.andWhere(
+                `(product.name ILIKE :search OR product.code ILIKE :search OR product.fabric ILIKE :search)`,
+                { search: `%${search}%` }
+            );
         }
 
         // Ordering logic

@@ -5,7 +5,7 @@ import { extname } from 'path';
 
 import { ProductsService } from './product.service';
 import {instanceToPlain} from "class-transformer";
-import {QueryProductDto} from "./shared/dto/query-product.dto";
+import {QueryParamsDto} from "../shared/dto/query-params.dto";
 
 @Controller('products')
 export class ProductsController {
@@ -51,7 +51,7 @@ export class ProductsController {
     }
 
     @Get()
-    async findAll(@Query() query: QueryProductDto) {
+    async findAll(@Query() query: QueryParamsDto) {
         const {
             page = 1,
             limit = 10,

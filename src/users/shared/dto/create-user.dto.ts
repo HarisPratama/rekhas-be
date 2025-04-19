@@ -13,13 +13,9 @@ export class CreateUserDto {
     @IsString({ message: 'Name must be a string' })
     name: string;
 
-    @IsNotEmpty({ message: 'Code is required' })
-    @IsString({ message: 'Code must be a string' })
-    code: string;
-
     @IsOptional()
     @IsString({ message: 'Nickname must be a string' })
-    nick_name?: string;
+    nickname?: string;
 
     @IsOptional()
     @IsString({ message: 'Image URL must be a string' })
@@ -39,9 +35,9 @@ export class CreateUserDto {
 
     @IsNotEmpty({ message: 'Role ID is required' })
     @IsNumber({}, { message: 'Role ID must be a number' })
-    roleId: number;
+    role_id: number;
 
     @IsOptional()
     @IsNumber({}, { message: 'Checkpoint ID must be a number' })
-    checkpoint_id?: number;
+    checkpoint_id: number;
 }

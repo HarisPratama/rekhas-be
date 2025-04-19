@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { Role } from '../roles/role.entity';
 import { Checkpoint } from '../checkpoints/checkpoint.entity';
+import {Expose} from "class-transformer";
 
 @Entity()
 export class User {
@@ -20,10 +21,16 @@ export class User {
     code: string;
 
     @Column({ nullable: true })
-    nick_name: string;
+    nickname: string;
 
     @Column({ nullable: true })
     image_url: string;
+
+    @Expose()
+    get full_image_url(): string {
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+        return this.image_url ? `${baseUrl}/uploads/profiles/${this.image_url}` : null;
+    }
 
     @Column({ default: false })
     is_pic: boolean;
@@ -36,10 +43,10 @@ export class User {
 
     // ✅ Foreign key for role
     @Column()
-    roleId: number;
+    role_id: number;
 
     @ManyToOne(() => Role, role => role.users)
-    @JoinColumn({ name: 'roleId' })
+    @JoinColumn({ name: 'role_id' })
     role: Role;
 
     // ✅ Foreign key for checkpoint (store)

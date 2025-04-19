@@ -1,7 +1,7 @@
 import {IsOptional, IsString, IsNumberString, IsNumber} from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class QueryProductDto {
+export class QueryParamsDto {
     @IsOptional()
     @Type(() => Number)
     @IsNumber()
@@ -27,4 +27,8 @@ export class QueryProductDto {
     @IsOptional()
     @IsString()
     orderBy?: string = 'created_at';
+
+    @IsOptional()
+    @IsString()
+    role?: string = '';
 }

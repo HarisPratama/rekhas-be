@@ -1,6 +1,6 @@
 import {Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query} from "@nestjs/common";
 import {WorkshopService} from "./workshop.service";
-import {QueryProductDto} from "../products/shared/dto/query-product.dto";
+import {QueryParamsDto} from "../shared/dto/query-params.dto";
 import {instanceToPlain} from "class-transformer";
 import {WorkshopStatus} from "./shared/const/workshop-status.enum";
 
@@ -10,7 +10,7 @@ export class WorkshopsController {
     constructor(private readonly workshopService: WorkshopService) {}
 
     @Get()
-    async findAll(@Query() query: QueryProductDto) {
+    async findAll(@Query() query: QueryParamsDto) {
         const {
             page = 1,
             limit = 10,

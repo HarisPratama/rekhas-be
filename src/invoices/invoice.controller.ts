@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InvoiceService } from './invoice.service';
 import { CreateInvoiceDto } from './shared/dto/create-invoice.dto';
-import {QueryProductDto} from "../products/shared/dto/query-product.dto";
+import {QueryParamsDto} from "../shared/dto/query-params.dto";
 import {FileInterceptor} from "@nestjs/platform-express";
 import {diskStorage} from "multer";
 import {extname} from "path";
@@ -20,7 +20,7 @@ export class InvoiceController {
     constructor(private readonly invoiceService: InvoiceService) {}
 
     @Get()
-    async findAll(@Query() query: QueryProductDto) {
+    async findAll(@Query() query: QueryParamsDto) {
         const { page, limit, order, orderBy, search } = query;
 
         return this.invoiceService.findAll(page, limit, orderBy, order, search);
