@@ -75,7 +75,7 @@ export class InvoiceService {
     ): Promise<Payment> {
         const invoice = await this.invoiceRepo.findOne({
             where: { id: dto.invoice_id },
-            relations: ['payments'],
+            relations: ['payments', 'order'],
         });
 
         if (!invoice) {
@@ -94,9 +94,9 @@ export class InvoiceService {
         }
 
         const payment = this.paymentRepo.create({
-            invoice,
+            invoice_id: invoice.id,
             amount: dto.amount,
-            type: dto.type,
+            type: invoice.order.payment_type,
             note: dto.note,
             proof_url: file?.filename,
         });

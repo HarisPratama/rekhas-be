@@ -14,15 +14,18 @@ export class Payment {
     @PrimaryGeneratedColumn()
     id: number;
 
+    @Column()
+    invoice_id: number;
+
     @ManyToOne(() => Invoice, invoice => invoice.payments)
     @JoinColumn({ name: 'invoice_id' })
     invoice: Invoice;
 
-    @Column('decimal', { precision: 12, scale: 2 })
+    @Column('decimal')
     amount: number;
 
-    @Column({ type: 'enum', enum: ['PARTIAL', 'FULL'], default: 'PARTIAL' })
-    type: 'PARTIAL' | 'FULL';
+    @Column({ type: 'enum', enum: ['partly_payment', 'full_payment'], default: 'full_payment' })
+    type: 'partly_payment' | 'full_payment';
 
     @Column({ nullable: true })
     note: string;
