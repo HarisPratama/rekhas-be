@@ -6,10 +6,11 @@ import { ProductsController } from './product.controller';
 import {CheckpointStockModule} from "../checkpoint-stock/checkpoint-stock.module";
 import {CheckpointModule} from "../checkpoints/checkpoint.module";
 import {ProductImage} from "./entities/product-image.entity";
+import {ProductSizeMeasurement} from "./entities/product-size-measurement.entity";
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Product, ProductImage]),
+        TypeOrmModule.forFeature([Product, ProductImage, ProductSizeMeasurement]),
         CheckpointModule,
         CheckpointStockModule
     ],

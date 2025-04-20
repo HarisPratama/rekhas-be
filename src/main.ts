@@ -17,6 +17,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/', // must match your image_url
   });
+  app.useStaticAssets(join(__dirname, '..', 'public'));
 
   await app.listen(3001);
 }

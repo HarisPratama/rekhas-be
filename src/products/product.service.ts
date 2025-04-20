@@ -1,6 +1,8 @@
 import {Injectable, NotFoundException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as XLSX from 'xlsx';
+
 import { Product } from './entities/product.entity';
 import {Checkpoint} from "../checkpoints/checkpoint.entity";
 import {CheckpointStock} from "../checkpoint-stock/checkpoint-stock.entity";
@@ -146,4 +148,70 @@ export class ProductsService {
 
         return this.imageRepo.save(images);
     }
+
+    async importFromExcel(filePath: string) {
+        const workbook = XLSX.readFile(filePath);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data: any[] = XLSX.utils.sheet_to_json(sheet);
+
+        const productsToSave: Product[] = [];
+        const errors = [];
+
+        for (const [index, row] of data.entries()) {
+            const rowNumber = index + 2; // +2 karena row pertama header, index mulai dari 0
+
+            const requiredFields = ['Name', 'Product Code', 'Fabric Code', 'Type', 'Price', 'Qty'];
+            const missingFields = requiredFields.filter((f) => !row[f] && row[f] !== 0);
+
+            if (missingFields.length > 0) {
+                errors.push(`Row ${rowNumber}: Missing fields - ${missingFields.join(', ')}`);
+                continue;
+            }
+
+            const existing = await this.productsRepository.findOne({ where: { code: row['Product Code'] } });
+            if (existing) {
+                errors.push(`Row ${rowNumber}: Product with code '${row['Product Code']}' already exists`);
+                continue;
+            }
+
+            const product = this.productsRepository.create({
+                name: row['Name'],
+                code: row['Product Code'],
+                fabric: row['Fabric Code'],
+                size: row['Size'] || null,
+                status: row['Status'] || null,
+                type: row['Type'],
+                description: row['Description'] || '',
+                price: Number(row['Price']),
+                quantity: Number(row['Qty']),
+                sizeMeasurement: {
+                    length: Number(row['Length'] ?? 0),
+                    waist: Number(row['Waist'] ?? 0),
+                    chest: Number(row['Chest'] ?? 0),
+                    collar: Number(row['Collar'] ?? 0),
+                    shoulder: Number(row['Shoulder'] ?? 0),
+                    sleeveLength: Number(row['Sleeve Length'] ?? 0),
+                    upperSleeveRim: Number(row['Upper Sleeve Rim'] ?? 0),
+                    lowerSleeveRim: Number(row['Lower Sleeve Rim'] ?? 0),
+                    thigh: Number(row['Thigh'] ?? 0),
+                    knee: Number(row['Knee'] ?? 0),
+                    foot: Number(row['Foot'] ?? 0),
+                    hip: Number(row['Hip'] ?? 0),
+                    armLength: Number(row['Arm Length'] ?? 0),
+                    cuff: Number(row['Cuff'] ?? 0),
+                    kriss: Number(row['Kriss'] ?? 0),
+                }
+            });
+
+            productsToSave.push(product);
+        }
+
+        const savedProducts = await this.productsRepository.save(productsToSave);
+
+        return {
+            message: `${savedProducts.length} product(s) imported successfully`,
+            errors,
+        };
+    }
+
 }

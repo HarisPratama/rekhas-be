@@ -1,7 +1,21 @@
-import {Controller, Get, Post, Body, Param, UseInterceptors, UploadedFile, UploadedFiles, Query} from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    Post,
+    Body,
+    Param,
+    UseInterceptors,
+    UploadedFile,
+    UploadedFiles,
+    Query,
+    Res
+} from '@nestjs/common';
 import {FileInterceptor, FilesInterceptor} from "@nestjs/platform-express";
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { Response } from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 
 import { ProductsService } from './product.service';
 import {instanceToPlain} from "class-transformer";
@@ -10,6 +24,33 @@ import {QueryParamsDto} from "../shared/dto/query-params.dto";
 @Controller('products')
 export class ProductsController {
     constructor(private readonly productsService: ProductsService) {}
+
+    @Get('template/download')
+    downloadTemplate(@Res() res: Response) {
+        const filePath = path.join(__dirname, '..', '..', 'public', 'templates', 'product-upload-template.xlsx');
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ message: 'Template not found' });
+        }
+
+        res.download(filePath, 'product-upload-template.xlsx'); // send file for download
+    }
+
+    @Post('upload-excel')
+    @UseInterceptors(
+        FileInterceptor('file', {
+            storage: diskStorage({
+                destination: './uploads',
+                filename: (req, file, cb) => {
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                    cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+                },
+            }),
+        }),
+    )
+    async uploadExcel(@UploadedFile() file: Express.Multer.File) {
+        return this.productsService.importFromExcel(file.path);
+    }
 
     @Post('upload')
     @UseInterceptors(

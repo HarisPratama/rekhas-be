@@ -1,10 +1,10 @@
-import {Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn} from "typeorm";
-import {Checkpoint} from "../../checkpoints/checkpoint.entity";
+import {Column, CreateDateColumn, Entity, OneToMany, OneToOne, PrimaryGeneratedColumn} from "typeorm";
 import {CheckpointStock} from "../../checkpoint-stock/checkpoint-stock.entity";
 import {Expose} from "class-transformer";
 import {SizePattern} from "../../size-pattern/size-pattern.entity";
 import {ProductImage} from "./product-image.entity";
 import {ProductTypeEnum} from "../shared/const/product-type.enum";
+import {ProductSizeMeasurement} from "./product-size-measurement.entity";
 
 @Entity()
 export class Product {
@@ -56,6 +56,10 @@ export class Product {
 
     @OneToMany(() => ProductImage, image => image.product, { cascade: true })
     images: ProductImage[];
+
+    @OneToOne(() => ProductSizeMeasurement, (m) => m.product, { cascade: true, eager: true })
+    sizeMeasurement: ProductSizeMeasurement;
+
 
     @CreateDateColumn()
     created_at: Date;
