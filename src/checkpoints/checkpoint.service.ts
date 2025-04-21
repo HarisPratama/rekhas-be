@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Checkpoint } from './checkpoint.entity';
 import {User} from "../users/user.entity";
+import {safeDeleteFile} from "../common/helpers/file.helper";
 
 @Injectable()
 export class CheckpointService {
@@ -73,9 +74,37 @@ export class CheckpointService {
         return this.checkpointRepo.findOne({ where: { id }, relations: ['pic'] });
     }
 
-    update(id: number, data: Partial<Checkpoint>) {
-        return this.checkpointRepo.update(id, data);
+    async update(id: number, data: Partial<Checkpoint>, file?: Express.Multer.File) {
+        try {
+            const checkpoint = await this.checkpointRepo.findOne({where: {id}});
+
+            if (!checkpoint) {
+                throw new NotFoundException('Checkpoint not found');
+            }
+
+            if (typeof data.pic === 'string') {
+                const parsed = JSON.parse(data.pic);
+                data.pic_id = parsed.id;
+                delete data.pic;
+                delete data.code;
+            }
+
+
+            Object.assign(checkpoint, data);
+
+            if (file) {
+                checkpoint.image_url = file.filename; // atau path lengkap jika perlu
+            }
+
+            return this.checkpointRepo.update(checkpoint.id, checkpoint);
+        } catch (err) {
+            if (file?.filename) {
+                safeDeleteFile(`uploads/checkpoints/${file.filename}`);
+            }
+            throw err;
+        }
     }
+
 
     remove(id: number) {
         return this.checkpointRepo.delete(id);

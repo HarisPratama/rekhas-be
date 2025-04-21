@@ -1,6 +1,10 @@
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
+import {Controller, Get, Post, Body, Param, Delete, Put, UseInterceptors, UploadedFile} from '@nestjs/common';
 import { CheckpointService } from './checkpoint.service';
 import { Checkpoint } from './checkpoint.entity';
+import {FileInterceptor} from "@nestjs/platform-express";
+import {diskStorage} from "multer";
+import {extname} from "path";
+import {instanceToPlain} from "class-transformer";
 
 @Controller('checkpoints')
 export class CheckpointController {
@@ -18,17 +22,35 @@ export class CheckpointController {
 
     @Get('summary')
     async getCheckpointSummary() {
-        return this.checkpointService.findAllSelectedFields();
+        const checkpoints = await this.checkpointService.findAllSelectedFields();
+        return instanceToPlain(checkpoints);
     }
 
     @Get(':id')
-    findOne(@Param('id') id: number) {
-        return this.checkpointService.findOne(id);
+    async findOne(@Param('id') id: number) {
+        const checkpoint = this.checkpointService.findOne(id);
+        return instanceToPlain(checkpoint);
     }
 
     @Put(':id')
-    update(@Param('id') id: number, @Body() data: Partial<Checkpoint>) {
-        return this.checkpointService.update(id, data);
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: diskStorage({
+                destination: './uploads/checkpoints',
+                filename: (req, file, cb) => {
+                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                    const ext = extname(file.originalname);
+                    cb(null, `checkpoint-${uniqueSuffix}${ext}`);
+                },
+            }),
+        }),
+    )
+    update(
+        @Param('id') id: number,
+        @Body() data: Partial<Checkpoint>,
+        @UploadedFile() file?: Express.Multer.File,
+    ) {
+        return this.checkpointService.update(id, data, file);
     }
 
     @Delete(':id')

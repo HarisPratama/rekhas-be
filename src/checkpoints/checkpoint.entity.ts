@@ -8,6 +8,7 @@ import {
 import { User } from '../users/user.entity';
 import {CheckpointStock} from "../checkpoint-stock/checkpoint-stock.entity";
 import {CheckpointTypeEnum} from "./shared/const/checkpoint-type.enum";
+import {Expose} from "class-transformer";
 
 @Entity('checkpoints')
 export class Checkpoint {
@@ -25,6 +26,21 @@ export class Checkpoint {
 
     @Column({ nullable: true })
     image_url: string;
+
+    @Expose()
+    get full_image_url(): string | null {
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+
+        if (!this.image_url) {
+            return null;
+        }
+
+        if (this.image_url.startsWith('http')) {
+            return this.image_url;
+        }
+
+        return `${baseUrl}/uploads/checkpoints/${this.image_url}`;
+    }
 
     @Column()
     phone: string;
