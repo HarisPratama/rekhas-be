@@ -14,10 +14,7 @@ export class Payment {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column()
-    invoice_id: number;
-
-    @ManyToOne(() => Invoice, invoice => invoice.payments)
+    @ManyToOne(() => Invoice, invoice => invoice.payments, {nullable: false})
     @JoinColumn({ name: 'invoice_id' })
     invoice: Invoice;
 

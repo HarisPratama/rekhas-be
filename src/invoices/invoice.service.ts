@@ -1,13 +1,17 @@
 import {BadRequestException, Injectable, NotFoundException} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
+import * as fs from 'fs';
+import * as path from 'path';
+import {DataSource, Repository} from "typeorm";
+
 import {Order} from "../orders/entities/order.entity";
-import {Repository} from "typeorm";
 import {Customer} from "../customers/entities/customer.entity";
 import {Invoice} from "./entities/invoice.entity";
 import {CreateInvoiceDto} from "./shared/dto/create-invoice.dto";
 import {Product} from "../products/entities/product.entity";
 import {CreatePaymentDto} from "./shared/dto/create-payment.dto";
 import {Payment} from "./entities/payment.entity";
+import {safeDeleteFile} from "../common/helpers/file.helper";
 
 
 @Injectable()
@@ -18,6 +22,7 @@ export class InvoiceService {
         @InjectRepository(Invoice) private invoiceRepo: Repository<Invoice>,
         @InjectRepository(Product) private productsRepo: Repository<Product>,
         @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
+        private readonly dataSource: DataSource,
     ) {
     }
 
@@ -73,45 +78,63 @@ export class InvoiceService {
         dto: CreatePaymentDto,
         file: Express.Multer.File,
     ): Promise<Payment> {
-        const invoice = await this.invoiceRepo.findOne({
-            where: { id: dto.invoice_id },
-            relations: ['payments', 'order'],
-        });
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
-        if (!invoice) {
-            throw new NotFoundException('Invoice not found');
+        try {
+            const invoice = await queryRunner.manager.findOne(this.invoiceRepo.target, {
+                where: { id: dto.invoice_id },
+                relations: ['payments', 'order'],
+            });
+
+            if (!invoice) {
+                throw new NotFoundException('Invoice not found');
+            }
+
+            const paidAmount = invoice.payments.reduce(
+                (acc, curr) => acc + Number(curr.amount),
+                0,
+            );
+
+            const newTotal = paidAmount + dto.amount;
+
+            if (newTotal > Number(invoice.total_amount)) {
+                throw new BadRequestException('Payment exceeds invoice total');
+            }
+
+            const payment = queryRunner.manager.create(this.paymentRepo.target, {
+                invoice: invoice,
+                amount: dto.amount,
+                type: invoice.order.payment_type,
+                note: dto.note,
+                proof_url: file?.filename,
+            });
+
+            const savedPayment = await queryRunner.manager.save(payment);
+
+            if (newTotal === Number(invoice.total_amount)) {
+                invoice.status = 'PAID';
+            } else if (newTotal > 0) {
+                invoice.status = 'PARTIAL';
+            }
+
+            await queryRunner.manager.update(this.invoiceRepo.target, invoice.id, {
+                status: invoice.status,
+            });
+
+            await queryRunner.commitTransaction();
+            return savedPayment;
+        } catch (err) {
+
+            if (file?.filename) {
+                safeDeleteFile(`uploads/payments/${file.filename}`);
+            }
+            await queryRunner.rollbackTransaction();
+            throw err;
+        } finally {
+            await queryRunner.release();
         }
-
-        const paidAmount = invoice.payments.reduce(
-            (acc, curr) => acc + Number(curr.amount),
-            0,
-        );
-
-        const newTotal = paidAmount + dto.amount;
-
-        if (newTotal > Number(invoice.total_amount)) {
-            throw new BadRequestException('Payment exceeds invoice total');
-        }
-
-        const payment = this.paymentRepo.create({
-            invoice_id: invoice.id,
-            amount: dto.amount,
-            type: invoice.order.payment_type,
-            note: dto.note,
-            proof_url: file?.filename,
-        });
-
-        const savedPayment = await this.paymentRepo.save(payment);
-
-        if (newTotal === Number(invoice.total_amount)) {
-            invoice.status = 'PAID';
-        } else if (newTotal > 0) {
-            invoice.status = 'PARTIAL';
-        }
-
-        await this.invoiceRepo.save(invoice);
-
-        return savedPayment;
     }
 
     async updateOrderId(invoiceId: number, orderId: number) {

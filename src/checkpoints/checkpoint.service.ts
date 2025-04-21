@@ -25,10 +25,35 @@ export class CheckpointService {
         return this.checkpointRepo.save(checkpoint);
     }
 
-    findAll() {
-        return this.checkpointRepo.find({
-            relations: ['pic'],
-        });
+    async findAll(
+        page: number = 1,
+        limit: number = 10,
+        orderBy: string = 'checkpoint.created_at',
+        order: 'DESC' | 'ASC' = 'DESC',
+        search: string = ''
+    ) {
+        const skip = (page - 1) * limit;
+        const queryBuilder = this.checkpointRepo
+            .createQueryBuilder('checkpoint')
+
+        if (search.length > 0) {
+            queryBuilder.andWhere('checkpoint.name ILIKE :search', { search: `%${search}%` });
+        }
+
+        queryBuilder
+            .skip(skip)
+            .take(limit);
+
+        const [data, total] = await queryBuilder.getManyAndCount();
+
+        return {
+            data,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        };
+
     }
 
     async findAllSelectedFields() {
