@@ -18,9 +18,9 @@ export class CheckpointStockController {
 
     @Get('checkpoint/:id')
     async findByCheckpoint(@Query() query: QueryCheckpointstockDto, @Param('id', ParseIntPipe) id: number) {
-        const { page, limit, order, orderBy, search } = query;
+        const { page, limit, order, orderBy, search, type } = query;
 
-        const stocks = this.stockService.findByCheckpoint(id, Number(page), Number(limit), orderBy, order, search);
+        const stocks = this.stockService.findByCheckpoint(id, Number(page), Number(limit), orderBy, order, search, type);
         return instanceToPlain(stocks);
     }
 }

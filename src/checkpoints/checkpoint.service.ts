@@ -64,12 +64,13 @@ export class CheckpointService {
                 'checkpoint.name',
                 'checkpoint.code',
                 'checkpoint.type',
+                'checkpoint.image_url',
             ])
             .getMany();
     }
 
     findOne(id: number) {
-        return this.checkpointRepo.findOne({ where: { id } });
+        return this.checkpointRepo.findOne({ where: { id }, relations: ['pic'] });
     }
 
     update(id: number, data: Partial<Checkpoint>) {
