@@ -13,6 +13,7 @@ import {CheckpointStockModule} from "./checkpoint-stock/checkpoint-stock.module"
 import {WorkShopModule} from "./workshops/workshop.module";
 import {InvoiceModule} from "./invoices/invoice.module";
 import {CartModule} from "./cart/cart.module";
+import {ConfigModule} from "@nestjs/config";
 
 @Module({
   imports: [
@@ -25,6 +26,9 @@ import {CartModule} from "./cart/cart.module";
       database: 'rekhas',
       autoLoadEntities: true,
       synchronize: true,
+    }),
+    ConfigModule.forRoot({
+      isGlobal: true,
     }),
       ProductsModule,
       OrdersModule,

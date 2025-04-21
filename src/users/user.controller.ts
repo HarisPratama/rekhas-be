@@ -2,7 +2,7 @@
 import {Controller, Get, Post, Body, Param, Delete, Put, Query, UseInterceptors, UploadedFile} from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './user.entity';
-import {CreateUserDto} from "./shared/dto/create-user.dto";
+import {CreateUserDto, VerifyOtpDto} from "./shared/dto/create-user.dto";
 import {QueryUserDto} from "./shared/dto/query-param-user.dto";
 import {FileInterceptor} from "@nestjs/platform-express";
 import {diskStorage} from "multer";
@@ -17,6 +17,19 @@ export class UserController {
     @Post()
     create(@Body() data: CreateUserDto) {
         return this.userService.create(data);
+    }
+
+    @Post('send-otp')
+    async sendOtp(@Body('phoneNumber') phoneNumber: string) {
+        return this.userService.sendOtp(phoneNumber);
+    }
+
+    @Post('verify-otp')
+    async verifyOtp(
+        @Body() data: VerifyOtpDto,
+    ) {
+        const { hash, otp } = data
+        return this.userService.verifyOtp(hash, otp);
     }
 
     @Post('profile')

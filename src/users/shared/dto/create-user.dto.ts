@@ -41,3 +41,14 @@ export class CreateUserDto {
     @IsNumber({}, { message: 'Checkpoint ID must be a number' })
     checkpoint_id: number;
 }
+
+
+export class VerifyOtpDto {
+    @IsNotEmpty({ message: 'Hash is required' })
+    @IsString({ message: 'Hash must be a string' })
+    hash: string;
+
+    @IsNotEmpty({ message: 'OTP is required' })
+    @IsString({ message: 'OTP must be a string' })
+    otp: string;
+}

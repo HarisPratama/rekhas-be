@@ -1,15 +1,72 @@
-import {BadRequestException, Injectable} from '@nestjs/common';
+import {BadRequestException, Inject, Injectable, UnauthorizedException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import {CreateUserDto} from "./shared/dto/create-user.dto";
+import {generateOtp, normalizeInternationalPhoneNumber} from "../common/helpers/otp-generator.helper";
+import {sendWhatsAppMessage} from "../common/helpers/wa-chat.helper";
+import {JwtService} from "@nestjs/jwt";
+import {createHmac} from "crypto";
+import {ConfigService} from "@nestjs/config";
 
 @Injectable()
 export class UserService {
     constructor(
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        private jwtService: JwtService,
+        private configService: ConfigService
     ) {}
+
+    getSecretKey() {
+        return this.configService.get<string>('SECRET_KEY');
+    }
+
+    async sendOtp(phoneNumber: string) {
+        const normalizedPhone = normalizeInternationalPhoneNumber(phoneNumber);
+
+        const { otp, hash, expires } = generateOtp(normalizedPhone);
+
+        const message = `Hai Sobat Rekhas \n${otp} adalah kode OTP anda untuk login.\nKode ini bersifat rahasia, jangan berikan kode ke siapapun.\n \n Salam,\n Rekhas Auto Message`;
+        await sendWhatsAppMessage(phoneNumber, message);
+
+        // Return hash ke client buat nanti verify
+        return {
+            hash: `${hash}.${phoneNumber}.${expires}`,
+            expires,
+        };
+    }
+
+    async verifyOtp(hash: string, otp: string) {
+        const [hashed, phoneNumber, expires] = hash.split('.');
+
+        const now = Date.now();
+        if (now > parseInt(expires)) {
+            throw new BadRequestException('Code expired');
+        }
+
+        const data = `${otp}.${phoneNumber}.${expires}`;
+        const newHash = createHmac('SHA256', this.getSecretKey())
+            .update(data)
+            .digest('hex');
+
+        if (hashed !== newHash) {
+            throw new UnauthorizedException('Wrong code input');
+        }
+
+        const user = await this.userRepo.findOne(
+            { where: { whatsapp_number: '+' + phoneNumber },
+            relations: ['role']}
+        );
+        if (!user) throw new UnauthorizedException('User not found');
+
+        const accessToken = this.jwtService.sign({ sub: user.id });
+
+        return {
+            accessToken,
+            user,
+        };
+    }
 
     async generateUserCode() {
         const lastCustomer = await this.userRepo.findOne({
