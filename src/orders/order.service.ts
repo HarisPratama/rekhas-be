@@ -215,6 +215,7 @@ export class OrdersService {
             .leftJoinAndSelect('order.sales', 'sales')
             .leftJoinAndSelect('order.items', 'items')
             .leftJoinAndSelect('items.product', 'products')
+            .leftJoinAndSelect('items.workshops', 'workshops')
             .where('order.id = :id', { id })
         const order = await queryBuilder.getOne();
 

@@ -211,7 +211,7 @@ export class InvoiceService {
     async findOne(id: number) {
         return this.invoiceRepo.findOne({
             where: { id },
-            relations: ['customer', 'products', 'payments', 'order'],
+            relations: ['customer', 'payments', 'order', 'order.items', 'order.items.product', 'order.items.workshops'],
         });
     }
 

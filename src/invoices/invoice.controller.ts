@@ -14,6 +14,7 @@ import {FileInterceptor} from "@nestjs/platform-express";
 import {diskStorage} from "multer";
 import {extname} from "path";
 import {CreatePaymentDto} from "./shared/dto/create-payment.dto";
+import {instanceToPlain} from "class-transformer";
 
 @Controller('invoices')
 export class InvoiceController {
@@ -57,7 +58,7 @@ export class InvoiceController {
         if (!invoice) {
             throw new NotFoundException('Invoice not found');
         }
-        return invoice;
+        return instanceToPlain(invoice);
     }
 
     @Patch(':id/order/:orderId')
