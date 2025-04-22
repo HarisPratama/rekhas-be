@@ -5,7 +5,7 @@ import {
     OneToMany,
     PrimaryGeneratedColumn,
     ManyToOne,
-    JoinColumn, OneToOne,
+    JoinColumn, OneToOne, UpdateDateColumn,
 } from 'typeorm';
 import { OrderItem } from './order-item.entity';
 import { Customer } from '../../customers/entities/customer.entity';
@@ -65,6 +65,9 @@ export class Order {
 
     @OneToMany(() => OrderItem, item => item.order, { cascade: true }) // <--- tambahkan cascade
     items: OrderItem[];
+
+    @UpdateDateColumn()
+    updated_at: Date;
 
     @CreateDateColumn()
     created_at: Date;

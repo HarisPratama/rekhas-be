@@ -112,7 +112,10 @@ export class WorkshopService {
             .take(limit);
 
         if (search) {
-            queryBuilder.andWhere('workshop.name ILIKE :search', { search: `%${search}%` });
+            queryBuilder.andWhere('(' +
+                'product.fabric ILIKE :search OR ' +
+                'product.code ILIKE :search OR ' +
+                'order.code ILIKE :search)', { search: `%${search}%` });
         }
 
         if (orderBy.includes('.')) {

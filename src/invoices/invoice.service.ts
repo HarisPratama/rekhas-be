@@ -189,7 +189,12 @@ export class InvoiceService {
         // search logic - contoh pakai product name
         if (search) {
             queryBuilder.andWhere(
-                `(invoice.name ILIKE :search OR invoice.customer.name ILIKE :search OR invoice.order.code ILIKE :search)`,
+                `(
+                invoice.code ILIKE :search OR 
+                customer.name ILIKE :search OR 
+                products.name ILIKE :search OR 
+                checkpoint.name ILIKE :search OR 
+                order.code ILIKE :search)`,
                 { search: `%${search}%` }
             );
         }

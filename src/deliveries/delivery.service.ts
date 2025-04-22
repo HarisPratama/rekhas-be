@@ -154,7 +154,9 @@ export class DeliveriesService {
 
         // search logic - contoh pakai product name
         if (search.length > 0) {
-            queryBuilder.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+            queryBuilder.andWhere(
+                '(product.name ILIKE :search OR delivery.code ILIKE :search)', { search: `%${search}%` }
+            );
         }
 
         const [data, total] = await queryBuilder.getManyAndCount();

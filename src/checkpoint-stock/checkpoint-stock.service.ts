@@ -56,7 +56,15 @@ export class CheckpointStockService {
 
         // Optional: add search condition
         if (search.length > 0) {
-            queryBuilder.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+            queryBuilder.andWhere(
+                `(
+                    product.name ILIKE :search OR 
+                    product.code ILIKE :search OR 
+                    product.fabric ILIKE :search OR 
+                    checkpoint.name ILIKE :search
+                )`,
+                { search: `%${search}%` }
+            );
         }
         const [data, total] = await queryBuilder.getManyAndCount();
 

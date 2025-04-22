@@ -178,25 +178,54 @@ export class OrdersService {
     async findAllByType(
         page: number = 1,
         limit: number = 10,
-        orderBy: string = 'delivery.created_at',
+        orderBy: string = 'order.created_at',
         order: 'DESC' | 'ASC' = 'DESC',
         type?: 'transaction' | 'customer' | 'items' | null,
         search?: string
     ) {
-        const [orders, total] = await this.ordersRepo.findAndCount({
-            skip: (page - 1) * limit,
-            take: limit,
-            order: {
-                [orderBy]: order, // dynamic ordering field
-            },
-            relations: [
-                'customer',
-                'sales',
-                'items',
-                'items.product',
-                'invoice'
-            ],
-        });
+        const skip = (page - 1) * limit;
+
+        const queryBuilder = this.ordersRepo
+            .createQueryBuilder('order')
+            .leftJoinAndSelect('order.customer', 'customer')
+            .leftJoinAndSelect('order.sales', 'sales')
+            .leftJoinAndSelect('order.invoice', 'invoice')
+            .leftJoinAndSelect('order.items', 'items')
+            .leftJoinAndSelect('items.product', 'product')
+
+        const orderColumns = ['created_at', 'updated_at', 'code', 'id'];
+
+        if (orderBy && orderBy.includes('.')) {
+            const [alias, field] = orderBy.split('.');
+
+            if (alias === 'product') {
+                queryBuilder.orderBy(`product.${field}`, order || 'DESC');
+            } else if (alias === 'order') {
+                queryBuilder.orderBy(`order.${field}`, order || 'DESC');
+            } else {
+                queryBuilder.orderBy(orderBy, order || 'DESC');
+            }
+        } else if (orderColumns.includes(orderBy)) {
+            queryBuilder.orderBy(`order.${orderBy}`, order || 'DESC');
+        } else {
+            queryBuilder.orderBy(`order.created_at`, order || 'DESC');
+        }
+
+        if (search.length > 0) {
+            queryBuilder.andWhere(
+                `(
+                    order.code ILIKE :search OR 
+                    product.name ILIKE :search OR 
+                    product.code ILIKE :search OR 
+                    product.fabric ILIKE :search OR 
+                    sales.name ILIKE :search OR 
+                    customer.name ILIKE :search
+                )`,
+                { search: `%${search}%` }
+            );
+        }
+
+        const [orders, total] = await queryBuilder.getManyAndCount();
 
         return {
             data: orders,
