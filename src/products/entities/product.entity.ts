@@ -14,13 +14,22 @@ export class Product {
     @Column()
     name: string;
 
-    @Column({ nullable: true })
+    @Column({ default: 'https://placehold.co/40' })
     image_url: string;
 
     @Expose()
-    get full_image_url(): string {
+    get full_image_url(): string | null {
         const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
-        return this.image_url ? `${baseUrl}${this.image_url}` : null;
+
+        if (!this.image_url) {
+            return null;
+        }
+
+        if (this.image_url.startsWith('http')) {
+            return this.image_url;
+        }
+
+        return `${baseUrl}${this.image_url}`;
     }
 
     @Column({ unique: true, nullable: true })
