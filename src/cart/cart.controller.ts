@@ -4,6 +4,7 @@ import {FilesInterceptor} from "@nestjs/platform-express";
 import {diskStorage} from "multer";
 import {extname} from "path";
 import {instanceToPlain} from "class-transformer";
+import {CollectionCategory} from "../orders/shared/const/collection-category.enum";
 
 @Controller('cart')
 export class CartController {
@@ -23,9 +24,9 @@ export class CartController {
     @Post(':customerId/cart')
     addToCart(
         @Param('customerId') customerId: number,
-        @Body() { productId, quantity, customerMeasurementId }: { productId: number; quantity: number, customerMeasurementId: string }
+        @Body() { productId, quantity, customerMeasurementId, collection_category }: { productId: number; quantity: number, customerMeasurementId: string, collection_category: CollectionCategory }
     ) {
-        return this.cartService.addToCart(customerId, productId, quantity, customerMeasurementId);
+        return this.cartService.addToCart(customerId, productId, quantity, customerMeasurementId, collection_category);
     }
 
     @Post(':customerId/cart-photos')
@@ -40,7 +41,7 @@ export class CartController {
     })) // upload multiple
     async addToCarPhotos(
         @Param('customerId', ParseIntPipe) customerId: number,
-        @Body() body: { productId: number; customerMeasurementId: string; quantity: number },
+        @Body() body: { productId: number; customerMeasurementId: string; quantity: number, collection_category: CollectionCategory },
         @UploadedFiles() photos: Express.Multer.File[]
     ) {
         const cartItem = await this.cartService.addToCartWithPhotos(customerId, body, photos);

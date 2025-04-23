@@ -1,12 +1,13 @@
-import {Injectable, NotFoundException} from "@nestjs/common";
+import {BadRequestException, Injectable, NotFoundException} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Cart} from "./entities/cart.entity";
-import {Repository} from "typeorm";
+import {DataSource, Repository} from "typeorm";
 import {CartItem} from "./entities/cart-item.entity";
 import {Customer} from "../customers/entities/customer.entity";
 import {Product} from "../products/entities/product.entity";
 import {CustomerMeasurement} from "../customers/entities/customer-measurement.entity";
 import {CustomerMeasurementImage} from "../customers/entities/customer-measurement-image";
+import {CollectionCategory} from "../orders/shared/const/collection-category.enum";
 
 @Injectable()
 export class CartService {
@@ -17,88 +18,157 @@ export class CartService {
         @InjectRepository(Customer) private customerRepo: Repository<Customer>,
         @InjectRepository(CustomerMeasurement) private custMeasurementRepo: Repository<CustomerMeasurement>,
         @InjectRepository(Product) private productRepo: Repository<Product>,
+        private readonly dataSource: DataSource
     ) {
     }
 
-    async addToCart(customerId: number, productId: number, quantity: number, customerMeasurementId: string,) {
-        const customer = await this.customerRepo.findOne({ where: { id: customerId } });
-        const product = await this.productRepo.findOne({ where: { id: productId } });
-        const customerMeasurement = await this.custMeasurementRepo.findOneOrFail({ where: { id: customerMeasurementId } });
+    async addToCart(
+        customerId: number,
+        productId: number,
+        quantity: number,
+        customerMeasurementId: string,
+        collection_category?: CollectionCategory,
+    ) {
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
-        let cart = await this.cartRepo.findOne({
-            where: { customer: { id: customerId } },
-            relations: ['items'],
-        });
+        try {
+            const customer = await queryRunner.manager.findOneOrFail(this.customerRepo.target, {
+                where: { id: customerId },
+            });
 
-        if (!cart) {
-            cart = this.cartRepo.create({ customer, items: [] });
+            const product = await queryRunner.manager.findOneOrFail(this.productRepo.target, {
+                where: { id: productId },
+            });
+
+            const customerMeasurement = await queryRunner.manager.findOneOrFail(this.custMeasurementRepo.target, {
+                where: { id: customerMeasurementId },
+            });
+
+            let cart = await queryRunner.manager.findOne(this.cartRepo.target, {
+                where: { customer: { id: customerId } },
+                relations: ['items', 'items.product', 'items.customerMeasurement'],
+            });
+
+            if (!cart) {
+                cart = this.cartRepo.create({ customer, items: [] });
+                cart = await queryRunner.manager.save(this.cartRepo.target, cart);
+            }
+
+            let existingItem = cart.items.find(
+                (item) =>
+                    item.product.id === productId &&
+                    item.customerMeasurement.id === customerMeasurementId,
+            );
+
+            if (collection_category && existingItem) {
+                if (existingItem.collection_category !== collection_category) {
+                    existingItem = null;
+                }
+            }
+
+            if (existingItem) {
+                existingItem.quantity += quantity;
+                await queryRunner.manager.save(this.cartItemRepo.target, existingItem);
+            } else {
+                const newItem = this.cartItemRepo.create({
+                    product,
+                    quantity,
+                    customerMeasurement,
+                    cart,
+                    collection_category,
+                });
+
+                await queryRunner.manager.save(this.cartItemRepo.target, newItem);
+            }
+
+            await queryRunner.commitTransaction();
+            return cart;
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
         }
-
-        const existingItem = cart.items.find(
-            (item) =>
-                item.product.id === productId &&
-                item.customerMeasurement.id === customerMeasurementId,
-        );
-        if (existingItem) {
-            existingItem.quantity += quantity;
-        } else {
-            const newItem = this.cartItemRepo.create({ product, quantity, customerMeasurement });
-            cart.items.push(newItem);
-        }
-
-        return this.cartRepo.save(cart);
     }
 
     async addToCartWithPhotos(
         customerId: number,
-        dto: { productId: number; customerMeasurementId: string; quantity: number },
-        photos: Express.Multer.File[]
+        dto: {
+            productId: number;
+            customerMeasurementId: string;
+            quantity: number;
+            collection_category?: CollectionCategory;
+        },
+        photos: Express.Multer.File[],
     ) {
-        const customer = await this.customerRepo.findOneByOrFail({ id: customerId });
-        const product = await this.productRepo.findOneByOrFail({ id: dto.productId });
-        const measurement = await this.custMeasurementRepo.findOneByOrFail({ id: dto.customerMeasurementId });
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
-        let cart = await this.cartRepo.findOne({
-            where: { customer: { id: customerId } },
-            relations: ['items', 'items.product', 'items.customerMeasurement'],
-        });
-
-        if (!cart) {
-            cart = this.cartRepo.create({ customer, items: [] });
-            await this.cartRepo.save(cart);
-        }
-
-        let existingItem = cart.items.find(
-            (item) =>
-                item.product.id === dto.productId &&
-                item.customerMeasurement.id === dto.customerMeasurementId
-        );
-
-        if (existingItem) {
-            existingItem.quantity += dto.quantity;
-            await this.cartItemRepo.save(existingItem);
-        } else {
-            const newItem = this.cartItemRepo.create({
-                cart,
-                product,
-                customerMeasurement: measurement,
-                quantity: dto.quantity,
+        try {
+            const customer = await queryRunner.manager.findOneByOrFail(this.customerRepo.target, { id: customerId });
+            const product = await queryRunner.manager.findOneByOrFail(this.productRepo.target, { id: dto.productId });
+            const measurement = await queryRunner.manager.findOneByOrFail(this.custMeasurementRepo.target, {
+                id: dto.customerMeasurementId,
             });
 
-            existingItem = await this.cartItemRepo.save(newItem);
-        }
+            let cart = await queryRunner.manager.findOne(this.cartRepo.target, {
+                where: { customer: { id: customerId } },
+                relations: ['items', 'items.product', 'items.customerMeasurement'],
+            });
 
-        if (photos && photos.length > 0) {
-            const imageEntities = photos.map((file) =>
-                this.custMeasurementImage.create({
-                    url: `/uploads/customer/product/${file.filename}`,
-                    measurement,
-                })
+            if (!cart) {
+                cart = this.cartRepo.create({ customer, items: [] });
+                cart = await queryRunner.manager.save(this.cartRepo.target, cart);
+            }
+
+            let existingItem = cart.items.find(
+                (item) =>
+                    item.product.id === dto.productId &&
+                    item.customerMeasurement.id === dto.customerMeasurementId,
             );
-            await this.custMeasurementImage.save(imageEntities);
-        }
 
-        return existingItem;
+            if (dto.collection_category && existingItem) {
+                if (existingItem.collection_category !== dto.collection_category) {
+                    existingItem = null;
+                }
+            }
+
+            if (existingItem) {
+                existingItem.quantity += dto.quantity;
+                await queryRunner.manager.save(this.cartItemRepo.target, existingItem);
+            } else {
+                const newItem = this.cartItemRepo.create({
+                    cart,
+                    product,
+                    customerMeasurement: measurement,
+                    quantity: dto.quantity,
+                    collection_category: dto.collection_category,
+                });
+
+                existingItem = await queryRunner.manager.save(this.cartItemRepo.target, newItem);
+            }
+
+            if (photos && photos.length > 0) {
+                const imageEntities = photos.map((file) =>
+                    this.custMeasurementImage.create({
+                        url: `/uploads/customer/product/${file.filename}`,
+                        measurement,
+                    }),
+                );
+                await queryRunner.manager.save(this.custMeasurementImage.target, imageEntities);
+            }
+
+            await queryRunner.commitTransaction();
+            return existingItem;
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
+        }
     }
 
 

@@ -3,6 +3,7 @@ import {OrderPriorityEnum} from "../const/order-priority.enum";
 import {OrderPaymentMethod, OrderPaymentType} from "../const/order-payment-type.enum";
 import {OrderStatus} from "../const/order-status.enum";
 import {Transform} from "class-transformer";
+import {CollectionCategory} from "../const/collection-category.enum";
 
 export class CreateOrderDto {
     @IsNumber()

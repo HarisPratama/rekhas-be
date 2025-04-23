@@ -10,6 +10,7 @@ import {
 import {Cart} from "./cart.entity";
 import {Product} from "../../products/entities/product.entity";
 import {CustomerMeasurement} from "../../customers/entities/customer-measurement.entity";
+import {CollectionCategory} from "../../orders/shared/const/collection-category.enum";
 
 @Entity()
 export class CartItem {
@@ -24,6 +25,9 @@ export class CartItem {
 
     @Column('int')
     quantity: number;
+
+    @Column({ type: 'enum', enum: CollectionCategory, nullable: true })
+    collection_category: CollectionCategory;
 
     @ManyToOne(() => CustomerMeasurement, { eager: true })
     customerMeasurement: CustomerMeasurement;

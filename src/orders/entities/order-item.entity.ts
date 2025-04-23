@@ -4,6 +4,7 @@ import {Product} from "../../products/entities/product.entity";
 import {CustomerMeasurement} from "../../customers/entities/customer-measurement.entity";
 import {OrderItemImage} from "./order-item-image.entity";
 import {Workshop} from "../../workshops/workshop.entity";
+import {CollectionCategory} from "../shared/const/collection-category.enum";
 
 @Entity()
 export class OrderItem {
@@ -24,6 +25,13 @@ export class OrderItem {
 
     @Column('decimal')
     price_each: number;
+
+    @Column({
+        type: 'enum',
+        enum: CollectionCategory,
+        nullable: true
+    })
+    collection_category: 'shirt' | 'trouser' | 'suit';
 
     @OneToMany(() => OrderItemImage, (img) => img.orderItem, { cascade: true })
     images: OrderItemImage[];

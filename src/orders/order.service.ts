@@ -105,6 +105,7 @@ export class OrdersService {
                     product: item.product,
                     quantity: item.quantity,
                     price_each: priceEach,
+                    collection_category: item.collection_category,
                     customerMeasurement: item.customerMeasurement,
                     images: item.customerMeasurement.images.map((img) =>
                         this.orderItemImageRepo.create({ url: img.url })
