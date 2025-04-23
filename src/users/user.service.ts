@@ -23,18 +23,22 @@ export class UserService {
     }
 
     async sendOtp(phoneNumber: string) {
-        const normalizedPhone = normalizeInternationalPhoneNumber(phoneNumber);
+        try {
+            const normalizedPhone = normalizeInternationalPhoneNumber(phoneNumber);
 
-        const { otp, hash, expires } = generateOtp(normalizedPhone);
+            const { otp, hash, expires } = generateOtp(normalizedPhone);
 
-        const message = `Hai Sobat Rekhas \n${otp} adalah kode OTP anda untuk login.\nKode ini bersifat rahasia, jangan berikan kode ke siapapun.\n \n Salam,\n Rekhas Auto Message`;
-        await sendWhatsAppMessage(phoneNumber, message);
+            const message = `Hai Sobat Rekhas \n${otp} adalah kode OTP anda untuk login.\nKode ini bersifat rahasia, jangan berikan kode ke siapapun.\n \n Salam,\n Rekhas Auto Message`;
+            await sendWhatsAppMessage(phoneNumber, message);
 
-        // Return hash ke client buat nanti verify
-        return {
-            hash: `${hash}.${phoneNumber}.${expires}`,
-            expires,
-        };
+            // Return hash ke client buat nanti verify
+            return {
+                hash: `${hash}.${phoneNumber}.${expires}`,
+                expires,
+            };
+        } catch (error) {
+            throw new UnauthorizedException();
+        }
     }
 
     async verifyOtp(hash: string, otp: string) {
@@ -89,18 +93,26 @@ export class UserService {
 
     async create(data: CreateUserDto, file?: Express.Multer.File) {
         if (data.whatsapp_number) {
-            if (data.whatsapp_number[0] !== '6' || data.whatsapp_number[1] !== '2') {
-                if (data.whatsapp_number[0] === '0') {
-                    data.whatsapp_number = data.whatsapp_number.slice(1);
-                }
-                data.whatsapp_number = '+62' + data.whatsapp_number;
+            let phone = data.whatsapp_number.trim();
+
+            if (phone.startsWith('+62')) {
+
+            } else if (phone.startsWith('62')) {
+                phone = '+' + phone;
+            } else if (phone.startsWith('0')) {
+                phone = '+62' + phone.slice(1);
+            } else {
+                throw new BadRequestException('Invalid WhatsApp number format');
             }
 
-            const existing = await this.userRepo.findOne({ where: { whatsapp_number: data.whatsapp_number } });
+            data.whatsapp_number = phone;
+
+            const existing = await this.userRepo.findOne({ where: { whatsapp_number: phone } });
             if (existing) {
                 throw new BadRequestException('WhatsApp number already exists');
             }
         }
+
 
         const newCode = await this.generateUserCode();
 
