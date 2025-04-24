@@ -115,6 +115,8 @@ export class WorkshopService {
             queryBuilder.andWhere('(' +
                 'product.fabric ILIKE :search OR ' +
                 'product.code ILIKE :search OR ' +
+                'workshop.notes ILIKE :search OR ' +
+                'workshop.type ILIKE :search OR ' +
                 'order.code ILIKE :search)', { search: `%${search}%` });
         }
 

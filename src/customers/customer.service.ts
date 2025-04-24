@@ -1,4 +1,4 @@
-import {BadRequestException, Injectable} from '@nestjs/common';
+import {BadRequestException, Injectable, NotFoundException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import {Customer} from './entities/customer.entity';
@@ -94,15 +94,31 @@ export class CustomerService {
         limit: number = 10,
         orderBy: string = 'delivery.created_at',
         order: 'DESC' | 'ASC' = 'DESC',
-        search: string = ''
+        search: string = '',
+        type: string = ''
     ) {
         const skip = (page - 1) * limit;
 
         const queryBuilder = this.customerRepo
-            .createQueryBuilder('customer')
+            .createQueryBuilder('customer');
+
+        if (type === 'list') {
+            queryBuilder
+                .leftJoin('customer.orders', 'orders')
+                .leftJoin(
+                    'orders.invoice',
+                    'invoice',
+                    'invoice.status != :completedStatus',
+                    { completedStatus: 'PAID' }
+                )
+                .addSelect('COALESCE(SUM(CAST(invoice.total_amount AS numeric)), 0)', 'customer_outstanding')
+                .groupBy('customer.id')
+        }
 
         if (search.length > 0) {
-            queryBuilder.andWhere('customer.name ILIKE :search', { search: `%${search}%` });
+            queryBuilder.andWhere('' +
+                'customer.name ILIKE :search OR ' +
+                'customer.address ILIKE :search', { search: `%${search}%` })
         }
 
         queryBuilder
@@ -120,8 +136,19 @@ export class CustomerService {
         };
     }
 
-    findOne(id: number) {
-        return this.customerRepo.findOne({ where: { id }, relations: ['measurements'] });
+    async findOne(id: number) {
+        const queryBuilder = this.customerRepo
+            .createQueryBuilder('customer')
+            .leftJoin('customer.orders', 'orders')
+            .leftJoin('orders.invoice', 'invoice')
+            .where('customer.id', {id})
+        const customer = await queryBuilder.getOne();
+
+        if (!customer) {
+            throw new NotFoundException(`customer with id ${id} not found`);
+        }
+
+        return customer;
     }
 
     update(id: number, data: Partial<Customer>) {

@@ -22,5 +22,9 @@ export class QueryCustomerDto {
 
     @IsOptional()
     @IsString()
+    type?: string = '';
+
+    @IsOptional()
+    @IsString()
     orderBy?: string = 'created_at';
 }

@@ -24,8 +24,8 @@ export class CustomerController {
 
     @Get()
     findAll(@Query() query: QueryCustomerDto) {
-        const { page, limit, order, orderBy, search } = query;
-        return this.customerService.findAll(Number(page),Number(limit), orderBy, order, search);
+        const { page, limit, order, orderBy, search, type } = query;
+        return this.customerService.findAll(Number(page),Number(limit), orderBy, order, search, type);
     }
 
     @Get(':id')
