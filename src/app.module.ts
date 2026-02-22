@@ -1,46 +1,48 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import {TypeOrmModule} from "@nestjs/typeorm";
-import {ProductsModule} from "./products/product.module";
-import {OrdersModule} from "./orders/order.module";
-import {DeliveriesModule} from "./deliveries/delivery.module";
-import {CheckpointModule} from "./checkpoints/checkpoint.module";
-import {CustomerModule} from "./customers/customer.module";
-import {UserModule} from "./users/user.module";
-import {RoleModule} from "./roles/role.module";
-import {CheckpointStockModule} from "./checkpoint-stock/checkpoint-stock.module";
-import {WorkShopModule} from "./workshops/workshop.module";
-import {InvoiceModule} from "./invoices/invoice.module";
-import {CartModule} from "./cart/cart.module";
-import {ConfigModule} from "@nestjs/config";
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ProductsModule } from './products/product.module';
+import { OrdersModule } from './orders/order.module';
+import { DeliveriesModule } from './deliveries/delivery.module';
+import { CheckpointModule } from './checkpoints/checkpoint.module';
+import { CustomerModule } from './customers/customer.module';
+import { UserModule } from './users/user.module';
+import { RoleModule } from './roles/role.module';
+import { CheckpointStockModule } from './checkpoint-stock/checkpoint-stock.module';
+import { WorkShopModule } from './workshops/workshop.module';
+import { InvoiceModule } from './invoices/invoice.module';
+import { CartModule } from './cart/cart.module';
+import { ConfigModule } from '@nestjs/config';
+
+// czf-qib-QWt-Wyh
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: 'postgres',
-      database: 'rekhas',
+      host: process.env.DATABASE_HOST || 'localhost',
+      port: Number(process.env.DATABASE_PORT) || 5432,
+      username: process.env.DATABASE_USERNAME || 'postgres',
+      password: process.env.DATABASE_PASSWORD || 'postgres',
+      database: process.env.DATABASE_NAME || 'rekhas',
       autoLoadEntities: true,
       synchronize: true,
     }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-      ProductsModule,
-      OrdersModule,
-      DeliveriesModule,
-      CheckpointModule,
-      CheckpointStockModule,
-      CustomerModule,
-      UserModule,
-      RoleModule,
-      InvoiceModule,
-      WorkShopModule,
-      CartModule,
+    ProductsModule,
+    OrdersModule,
+    DeliveriesModule,
+    CheckpointModule,
+    CheckpointStockModule,
+    CustomerModule,
+    UserModule,
+    RoleModule,
+    InvoiceModule,
+    WorkShopModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
